@@ -1,0 +1,39 @@
+/* This file is for your main application css. */
+
+$fa-font-path: "../node_modules/@fortawesome/fontawesome-free/webfonts";
+
+@import "./phoenix.css";
+@import "../../deps/phoenix_live_view/assets/css/live_view.css";
+@import "~@fortawesome/fontawesome-free/scss/fontawesome";
+@import "~@fortawesome/fontawesome-free/scss/regular";
+@import "~@fortawesome/fontawesome-free/scss/solid";
+@import "~@fortawesome/fontawesome-free/scss/brands";
+
+.devices {
+  display: flex;
+  justify-content: center;
+
+  .device {
+    display: inline-block;
+    padding: 8px;
+    border-radius: 6px;
+    background: white;
+    margin: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+
+    min-width: 10rem;
+    min-height: 10rem;
+
+    &.active {
+      border: 1px solid #0069d9;
+    }
+
+    .icon {
+      font-size: 3rem;
+      margin: 1rem;
+    }
+  }
+}

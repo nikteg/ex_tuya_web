@@ -1,0 +1,11 @@
+<section class="phx-hero">
+  <div class="devices">
+  <%= for device <- @devices do %>
+    <%= live_link class: (if device.id == @device.id, do: "device active", else: "device"), to: Routes.live_path(@socket, ExTuyaWebWeb.PageLive, %{device_id: device.id}) do %>
+      <i class="icon fas fa-lightbulb"></i>
+      <span class="id"><%= device.id %></span>
+    <% end %>
+  <% end %>
+  </div>
+  <%= live_component @socket, ExTuyaWebWeb.ChartComponent, changeset: @device_changeset %>
+</section>
