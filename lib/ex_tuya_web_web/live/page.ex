@@ -1,41 +1,78 @@
-defmodule ExTuyaWebWeb.Device do
-  defstruct [:id, :brightness, color: "#000000"]
-end
-
 defmodule ExTuyaWebWeb.PageLive do
   use Phoenix.LiveView
   alias ExTuyaWebWeb.Device
+  import Ecto.Changeset
 
   def render(assigns) do
     Phoenix.View.render(ExTuyaWebWeb.PageView, "index.html", assigns)
   end
 
   def mount(_session, socket) do
-    if connected?(socket), do: :timer.send_interval(1000, self(), :tick)
+    if connected?(socket) do
+      send(self(), :login)
+    end
 
-    # Device.changeset(device, attrs)
-
-    devices = [
-      %Device{id: "test-id", brightness: 50, color: "#ff0000"},
-      %Device{id: "test-id-2", brightness: 70}
-    ]
-
-    {:ok, assign(put_date(socket), devices: devices, device: hd(devices))}
+    {:ok,
+     assign(socket,
+       devices: [],
+       changeset: nil
+     )}
   end
 
-  def handle_info(:tick, socket) do
-    {:noreply, put_date(socket)}
+  def handle_info(:login, socket) do
+    IO.inspect(socket.assigns, label: "In login handle")
+
+    {:ok, %{"access_token" => access_token}} =
+      ExTuya.login(%ExTuya.Credentials{
+        userName: Application.fetch_env!(:ex_tuya, :username),
+        password: Application.fetch_env!(:ex_tuya, :password),
+        countryCode: "46",
+        bizType: "tuya"
+      })
+
+    {:ok, devices} = ExTuya.get_devices(access_token) |> IO.inspect(label: "get devices")
+
+    devices_changesets =
+      Enum.map(devices, fn d ->
+        %{"brightness" => brightness} = d["data"]
+
+        cast(
+          %ExTuyaWeb.Device{},
+          %{
+            id: d["id"],
+            icon: d["icon"],
+            name: d["name"],
+            dev_type: d["dev_type"],
+            ha_type: d["ha_type"],
+            brightness: brightness
+          },
+          [:id, :name, :dev_type, :ha_type, :brightness, :icon]
+        )
+      end)
+
+    devices =
+      Enum.map(devices_changesets, fn cs ->
+        {:ok, device} = apply_action(cs, :insert)
+        device
+      end)
+      |> IO.inspect(label: "devices")
+
+    {:noreply,
+     assign(socket,
+       access_token: access_token,
+       devices: devices,
+       changeset: hd(devices_changesets)
+     )}
   end
 
-  def handle_event("nav", path, socket) do
-    IO.inspect(path, label: "Nav")
-    {:noreply, socket}
-  end
+  def handle_event("update_device", %{"device" => params}, socket) do
+    changeset = cast(socket.assigns.changeset, params, [:brightness, :color])
 
-  def handle_event("update_device", %{"device"}, socket) do
-    IO.inspect(value)
+    {:ok, device} = apply_action(changeset, :update)
 
-    {:noreply, socket}
+    ExTuya.Light.set_brightness(socket.assigns.access_token, device.id, device.brightness)
+
+    {:noreply, assign(socket, changeset: changeset)}
   end
 
   def handle_params(%{"device_id" => device_id} = _params, _uri, socket) do
@@ -46,40 +83,7 @@ defmodule ExTuyaWebWeb.PageLive do
     {:noreply, socket}
   end
 
-  defp put_date(socket) do
-    assign(socket, time: DateTime.utc_now())
-  end
-
   defp put_device(socket, device_id) do
     assign(socket, device: Enum.find(socket.assigns.devices, fn d -> d.id == device_id end))
-  end
-end
-
-defimpl Phoenix.HTML.FormData, for: ExTuyaWebWeb.Device do
-  def input_value(device, %{data: data, params: params}, field) do
-    Map.fetch!(device, field)
-  end
-
-  def input_validations(device, form, field), do: []
-
-  def input_type(device, form, :brightness), do: "range"
-  def input_type(device, form, field), do: :text_input
-
-  def to_form(device, opts) do
-    {params, opts} = Keyword.pop(opts, :params, %{})
-
-    %Phoenix.HTML.Form{
-      source: device,
-      impl: __MODULE__,
-      id: device.id,
-      name: "device",
-      params: params,
-      data: %{},
-      errors: [],
-      options: opts
-    }
-  end
-
-  def to_form(device, form, field, options) do
   end
 end
